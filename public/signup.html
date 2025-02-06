@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Signup</title>
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <link rel="stylesheet" href="chat_app_styles.css">
+</head>
+<body>
+    <h2>Signup</h2>
+    <div class="form-container">
+        <input type="text" id="firstname" placeholder="First Name" required />
+        <input type="text" id="lastname" placeholder="Last Name" required />
+        <input type="text" id="username" placeholder="Username" required />
+        <input type="password" id="password" placeholder="Password" required />
+        <button onclick="signup()">Signup</button>
+    </div>
+    <p>Already have an account? <a href="login.html">Login here</a></p>
+
+    <script>
+        function signup() {
+            const user = {
+                firstname: $('#firstname').val().trim(),
+                lastname: $('#lastname').val().trim(),
+                username: $('#username').val().trim(),
+                password: $('#password').val().trim()
+            };
+
+            if (!user.firstname || !user.lastname || !user.username || !user.password) {
+                alert("All fields are required!");
+                return;
+            }
+
+            fetch('http://localhost:5500/api/users/signup', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(user)
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.message === 'User registered successfully') {
+                    alert('Signup successful! Please log in.');
+                    window.location.href = 'login.html';
+                } else {
+                    alert(data.message);
+                }
+            })
+            .catch(error => console.error('Error:', error));
+        }
+    </script>
+</body>
+</html>

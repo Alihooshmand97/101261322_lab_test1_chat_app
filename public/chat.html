@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chat Room</title>
+    <script src="https://cdn.socket.io/4.0.1/socket.io.min.js"></script>
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <link rel="stylesheet" href="chat_app_styles.css">
+</head>
+<body>
+    <h2>Chat Room</h2>
+
+    <!-- Predefined Room Selection -->
+    <label for="room">Select Room:</label>
+    <select id="room">
+        <option value="devops">DevOps</option>
+        <option value="cloud computing">Cloud Computing</option>
+        <option value="covid19">Covid-19</option>
+        <option value="sports">Sports</option>
+        <option value="nodeJS">NodeJS</option>
+    </select>
+    <button onclick="joinRoom()">Join Room</button>
+    <button onclick="logout()">Logout</button>
+
+    <h4>Users in Room:</h4>
+    <ul id="roomUsers"></ul>
+
+    <!-- Chat Box -->
+    <div id="chatBox" style="display:none;">
+        <h3>Room: <span id="currentRoom"></span></h3>
+        <div id="messages"></div>
+        <input type="text" id="message" placeholder="Type a message..." />
+        <button onclick="sendMessage()">Send</button>
+        <p id="typingIndicator" style="color: gray; display: none;"></p>
+        <button onclick="leaveRoom()">Leave Room</button>
+    </div>
+
+    <!-- Private Messaging -->
+    <h4>Private Messaging</h4>
+    <input type="text" id="privateUser" placeholder="Enter username for DM" />
+    <input type="text" id="privateMessage" placeholder="Type private message..." />
+    <button onclick="sendPrivateMessage()">Send Private</button>
+
+    <script>
+        const socket = io('http://localhost:5500');
+        let typingTimer;
+
+        // Prevent access if not logged in
+        if (!localStorage.getItem('user')) {
+            window.location.href = 'login.html';
+        }
+
+        function joinRoom() {
+            const user = JSON.parse(localStorage.getItem('user'));
+            const room = $('#room').val();
+
+            if (!user || !room) {
+                alert('Select a valid room');
+                return;
+            }
+
+            socket.emit('joinRoom', { username: user.username, room });
+            $('#currentRoom').text(room);
+            $('#chatBox').show();
+        }
+
+        function sendMessage() {
+            const user = JSON.parse(localStorage.getItem('user'));
+            const room = $('#currentRoom').text();
+            const message = $('#message').val().trim();
+
+            if (!user || !user.username) {
+                alert("User not found. Please log in again.");
+                window.location.href = "login.html"; 
+                return;
+            }
+
+            if (!message) return;
+
+            socket.emit('chatMessage', { 
+                from_user: user.username, 
+                room, 
+                message 
+            });
+
+            $('#message').val('');
+        }
+
+        function sendPrivateMessage() {
+            const user = JSON.parse(localStorage.getItem('user'));
+            const toUser = $('#privateUser').val().trim();
+            const message = $('#privateMessage').val().trim();
+
+            if (!toUser || !message) {
+                alert('Enter a valid username and message.');
+                return;
+            }
+
+            socket.emit('privateMessage', { 
+                from_user: user.username, 
+                to_user: toUser, 
+                message 
+            });
+
+            $('#messages').append(`<p><strong>To ${toUser}:</strong> ${message} (Private)</p>`); 
+            $('#privateMessage').val('');
+        }
+
+        function leaveRoom() {
+            const user = JSON.parse(localStorage.getItem('user'));
+            const room = $('#currentRoom').text();
+
+            if (!room) {
+                alert('You are not in any room.');
+                return;
+            }
+
+            socket.emit('leaveRoom', { username: user.username, room });
+            $('#messages').empty();
+            $('#chatBox').hide();
+            alert(`You left the room: ${room}`);
+        }
+
+        // Update active users list in the room
+        socket.on('roomUsers', (users) => {
+            $('#roomUsers').empty();
+            users.forEach(user => {
+                $('#roomUsers').append(`<li>${user}</li>`);
+            });
+        });
+
+        // Display incoming messages
+        socket.on('message', (data) => {
+            $('#messages').append(`<p><strong>${data.from_user}:</strong> ${data.message}</p>`);
+        });
+
+        // Receive private messages
+        socket.on('privateMessage', (data) => {
+            $('#messages').append(`<p><strong>Private from ${data.from_user}:</strong> ${data.message}</p>`);
+        });
+
+        // Typing Indicator
+        $('#message').on('input', function () {
+            const user = JSON.parse(localStorage.getItem('user'));
+            const room = $('#currentRoom').text();
+            socket.emit('typing', { username: user.username, room });
+        });
+
+        $('#message').on('keyup', function () {
+            clearTimeout(typingTimer);
+            typingTimer = setTimeout(() => {
+                const room = $('#currentRoom').text();
+                socket.emit('stopTyping', { room });
+            }, 2000);
+        });
+
+        socket.on('userTyping', ({ username }) => {
+            $('#typingIndicator').text(`${username} is typing...`).show();
+        });
+
+        socket.on('userStoppedTyping', () => {
+            $('#typingIndicator').hide();
+        });
+
+        function logout() {
+            localStorage.removeItem('user');
+            alert('Logged out successfully!');
+            window.location.href = 'login.html';
+        }
+    </script>
+</body>
+</html>
